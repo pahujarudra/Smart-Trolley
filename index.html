@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Trolley Payment</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+
+  <div id="app" class="min-h-screen flex items-center justify-center p-6"></div>
+
+  <script>
+    const app = document.getElementById('app');
+    const params = new URLSearchParams(window.location.search);
+    const billId = params.get('billId');
+
+    if (!billId) {
+      // No billId → show landing page
+      app.innerHTML = `
+        <div class="max-w-xl text-center">
+          <h1 class="text-3xl font-bold mb-4 text-blue-600">Smart Trolley System</h1>
+          <p class="mb-4 text-lg">
+            Our Smart Trolley enables a contactless and queue-free shopping experience by integrating barcode scanning, automatic billing, and UPI-based payments directly from the cart.
+          </p>
+          <ul class="text-left list-disc list-inside mb-4">
+            <li>Barcode Scanning via ESP32-CAM</li>
+            <li>OLED Display with Cart Summary</li>
+            <li>Real-time Quantity Adjustment using Buttons</li>
+            <li>Instant Payment via Razorpay UPI QR</li>
+          </ul>
+          <p class="text-gray-600">To view your bill and pay, scan from the Smart Trolley device or visit a link with your bill ID.</p>
+        </div>
+      `;
+    } else {
+      // billId exists → show form
+      app.innerHTML = `
+        <div class="bg-white shadow-md p-8 rounded-md max-w-md w-full">
+          <h2 class="text-xl font-bold mb-4 text-blue-600">Enter your details to proceed with payment</h2>
+          <form id="paymentForm" class="space-y-4">
+            <input type="text" id="name" placeholder="Your Name" required class="w-full border px-3 py-2 rounded">
+            <input type="tel" id="phone" placeholder="Phone Number" required class="w-full border px-3 py-2 rounded">
+            <input type="email" id="email" placeholder="Email" required class="w-full border px-3 py-2 rounded">
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Proceed to Pay</button>
+          </form>
+          <div id="loading" class="mt-4 text-center text-sm text-gray-500 hidden">⏳ Generating payment link...</div>
+        </div>
+      `;
+
+      document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          billId,
+          name: document.getElementById('name').value,
+          phone: document.getElementById('phone').value,
+          email: document.getElementById('email').value
+        };
+
+        const loadingText = document.getElementById('loading');
+        loadingText.classList.remove('hidden');
+
+        try {
+          const res = await fetch('https://your-replit-backend.replit.app/create-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+
+          if (data.paymentLink) {
+            setTimeout(() => {
+              window.location.href = data.paymentLink;
+            }, 2000); // 2 seconds delay for smooth UX
+          } else {
+            alert("❌ Payment link not received. Try again.");
+            loadingText.classList.add('hidden');
+          }
+        } catch (err) {
+          console.error(err);
+          alert("⚠️ Something went wrong. Please try again.");
+          loadingText.classList.add('hidden');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
