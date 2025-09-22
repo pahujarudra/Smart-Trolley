@@ -5,52 +5,97 @@
   <title>Smart Trolley</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 text-gray-800">
-  <div class="max-w-xl mx-auto mt-16 p-6 bg-white shadow rounded" id="app">
-    <h1 class="text-2xl font-bold mb-4">🛒 Smart Trolley</h1>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-lg mx-auto p-6 bg-white shadow-lg rounded-xl" id="app">
+    <h1 class="text-3xl font-bold mb-6 text-center">🛒 Smart Trolley</h1>
     <div id="main"></div>
   </div>
 
   <script>
-    const backend = 'https://74789124-9e56-4b80-83bd-1b451c5bf62e-00-1x26gd4e7wpwb.pike.repl.co'; // Replace with your backend Replit URL
-    const secret = 'supersecure123'; // Same as VERCEL_SECRET in Replit
+    const backend = 'https://74789124-9e56-4b80-83bd-1b451c5bf62e-00-1x26gd4e7wpwb.pike.repl.co';
+    const secret = 'supersecure123';
 
     const params = new URLSearchParams(window.location.search);
     const billId = params.get('billId');
-
+    const success = params.get('success');
     const main = document.getElementById('main');
 
     if (!billId) {
-      main.innerHTML = `
-        <p class="mb-4">There are only specific bill ids stored in backend. The backend is on only when the replit project is running.</p>
-        <label class="block mb-2 font-medium">Enter Bill ID:</label>
-        <input id="billIdInput" type="text" class="border rounded px-3 py-2 w-full mb-4" placeholder="e.g. 1234" />
-        <button onclick="goToBill()" class="bg-blue-500 text-white px-4 py-2 rounded">Continue</button>
-      `;
+      renderBillInput();
     } else {
+      checkBillStatus(billId, success);
+    }
+
+    function renderBillInput() {
       main.innerHTML = `
-        <p class="mb-2">Bill ID: <strong>${billId}</strong></p>
-        <input id="name" class="block border mb-2 w-full px-3 py-2 rounded" placeholder="Name">
-        <input id="email" class="block border mb-2 w-full px-3 py-2 rounded" placeholder="Email">
-        <input id="phone" class="block border mb-2 w-full px-3 py-2 rounded" placeholder="Phone">
-        <button onclick="pay()" class="bg-green-500 text-white px-4 py-2 rounded">Continue to Pay</button>
-        <div id="msg" class="mt-4 text-sm text-gray-600"></div>
+        <p class="mb-4">Enter a Bill ID to continue (backend must be running on Replit).</p>
+        <label class="block mb-2 font-medium">Bill ID</label>
+        <input id="billIdInput" type="text" class="border rounded px-3 py-2 w-full mb-4" placeholder="e.g. 1234" />
+        <button onclick="goToBill()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg">Continue</button>
       `;
     }
 
     function goToBill() {
-      const id = document.getElementById('billIdInput').value;
+      const id = document.getElementById('billIdInput').value.trim();
       if (id) {
         window.location.href = `?billId=${id}`;
       }
     }
 
-    async function pay() {
+    async function checkBillStatus(billId, success) {
+      main.innerHTML = `<p class="text-center">🔄 Checking bill status...</p>`;
+      try {
+        const res = await fetch(`${backend}/api/bill/${billId}`, {
+          headers: { 'x-vercel-secret': secret }
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          main.innerHTML = `<p class="text-red-600 text-center">${data.error}</p>`;
+          return;
+        }
+
+        if (data.paid) {
+          renderPaid(billId, data);
+        } else {
+          renderUnpaid(billId, data, success);
+        }
+      } catch (err) {
+        main.innerHTML = `<p class="text-red-600 text-center">❌ Network error. Try again later.</p>`;
+      }
+    }
+
+    function renderPaid(billId, bill) {
+      main.innerHTML = `
+        <div class="text-center">
+          <p class="text-green-600 text-xl font-semibold mb-2">✅ Payment Successful</p>
+          <p class="mb-4">Bill <strong>#${billId}</strong> is already paid.</p>
+          <p class="mb-2">Total: <strong>₹${bill.total}</strong></p>
+          <p class="mb-2">Payment Link: <code>${bill.payment_link_id || '-'}</code></p>
+          <button onclick="window.location.href='/'" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Go Home</button>
+        </div>
+      `;
+    }
+
+    function renderUnpaid(billId, bill, success) {
+      let msg = success ? `<p class="text-yellow-600 mb-2">⚠️ Payment not yet confirmed. If you paid, wait a few seconds and refresh.</p>` : '';
+      main.innerHTML = `
+        <p class="mb-2">Bill ID: <strong>${billId}</strong></p>
+        <p class="mb-4">Total Amount: <strong>₹${bill.total}</strong></p>
+        <input id="name" class="block border mb-2 w-full px-3 py-2 rounded" placeholder="Name">
+        <input id="email" class="block border mb-2 w-full px-3 py-2 rounded" placeholder="Email">
+        <input id="phone" class="block border mb-4 w-full px-3 py-2 rounded" placeholder="Phone">
+        <button onclick="pay('${billId}')" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Pay Now</button>
+        <div id="msg" class="mt-4 text-sm text-gray-600">${msg}</div>
+      `;
+    }
+
+    async function pay(billId) {
       const name = document.getElementById('name').value;
       const email = document.getElementById('email').value;
       const phone = document.getElementById('phone').value;
       const msg = document.getElementById('msg');
-      msg.innerText = 'Processing... Please wait 5 seconds.';
+      msg.innerText = 'Processing... Please wait.';
 
       try {
         const res = await fetch(`${backend}/api/pay`, {
@@ -62,8 +107,6 @@
           body: JSON.stringify({ billId, name, email, phone })
         });
 
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
         const data = await res.json();
         if (data.url) {
           msg.innerText = 'Redirecting to payment...';
@@ -72,7 +115,7 @@
           msg.innerText = data.error || 'Error occurred.';
         }
       } catch (err) {
-        msg.innerText = 'Network error.';
+        msg.innerText = '❌ Network error.';
       }
     }
   </script>
